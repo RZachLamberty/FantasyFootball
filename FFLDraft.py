@@ -224,7 +224,9 @@ class DraftData():
 
     def best_replacement_available(self, N=25):
         """ Extract the best N remaining players at each position, and determine
-            what their replacement values and current "pain value" are.
+            what their replacement values and current "pain value" are. Plot the
+            series of replacement picks to give a future-looking view on the
+            decision to not draft the calculated top remaining player
 
         """
         topNDic = {pos: self.top_n(N=N, pos=pos, isFA=True) for pos in POS_LIST}
