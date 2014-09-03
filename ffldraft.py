@@ -15,6 +15,7 @@ Usage:
 """
 
 import csv
+import datetime
 import os
 import pylab
 
@@ -46,9 +47,11 @@ LEAGUE_TEAMS = {
 }
 TEAM_LIST = sorted([v[0] for (k, v) in LEAGUE_TEAMS.items()])
 
-F_DATA = os.path.join(
-    os.path.dirname(os.path.realpath(__file__)),
-    'ffl_data_20140901.csv'
+F_DATA = datetime.datetime.now().strftime(
+    os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        'ffl_data_%Y%m%d.csv'
+    )
 )
 
 POS_COLOR = {
