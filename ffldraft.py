@@ -34,7 +34,7 @@ pylab.close('All')
 LEAGUE_TEAMS = {
     1: ['CL', 'Captain\'s Log', 'Dylan Thomson'],
     2: ['HPZ', 'Heavy Petting Zoo', 'Zach Lamberty'],
-    3: ['ASS', 'Great White Sharts', 'Jeff Miller'],
+    3: ['ASS', 'Great White Sharts!', 'Jeff Miller'],
     4: ['HIT', 'I\'d Still Hit It', 'Collin Solberg'],
     5: ['JNZ', 'Just Noise', 'Ben Koch'],
     6: ['CFB', 'Chicken Fried Blumpkins', 'Brad Nicolai'],
@@ -47,11 +47,9 @@ LEAGUE_TEAMS = {
 }
 TEAM_LIST = sorted([v[0] for (k, v) in LEAGUE_TEAMS.items()])
 
-F_DATA = datetime.datetime.now().strftime(
-    os.path.join(
-        os.path.dirname(os.path.realpath(__file__)),
-        'ffl_data_%Y%m%d.csv'
-    )
+F_DATA = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)),
+    'ffl_data_20140901.csv'
 )
 
 POS_COLOR = {
@@ -145,7 +143,7 @@ class DraftData():
                                                     -x['PTS']))
 
     # Updating who has been drafted -- interactive
-    def get_player_interactive(self):
+    def get_player_interactive(self, allowDrafted=False):
         """ Allow the user to select a player by initials """
         # Prompt the user to choose who has been drafted and on which team
         firstNameInit = raw_input('First Name Initial?\t')
@@ -160,7 +158,7 @@ class DraftData():
                 player['LAST'].lower().startswith(lastNameInit.lower()),
             ])
 
-            if isMatch and player['F TEAM'] == 'FA':
+            if isMatch and (allowDrafted or player['F TEAM'] == 'FA'):
                 matches.append(player)
                 print '# {RNK:>4}: {FIRST:} {LAST:}, {TEAM:} {POS:}'.format(**player)
 
@@ -210,7 +208,7 @@ class DraftData():
 
     def false_draft_interactive(self):
         """ Undo a previous draft that has been rolled back (it always happens) """
-        player = self.get_player_interactive()
+        player = self.get_player_interactive(allowDrafted=True)
 
         self.been_drafted(player, 'FA')
 
@@ -226,7 +224,7 @@ class DraftData():
         self.state_of_draft(posList)
 
     # Updating who has been drafted -- from file
-    def simulate_draft_from_file(self, fpicks, fteam):
+    def simulate_draft_from_file(self, fpicks, fteam, slow=False):
         """ Read in a series of picks and simulate the file from that """
         with open(fpicks, 'r') as fIn:
             draft = list(csv.DictReader(fIn))
@@ -241,15 +239,32 @@ class DraftData():
         for d in draft:
             # tell user which player was picked and have them get that player
             # interactively
-            print '\n{PickPlayer:} drafted by {FantasyTeam:}\n'.format(**d)
-            players = self.get_player_interactive()
+            print '\n{playerpos:} drafted by {team:}\n'.format(**d)
 
-            if players:
-                # same with team name, but build dictionary for get_team_interactive
+            flpos = d['playerpos'].split(' ')
+            first = flpos[0]
+            last = ' '.join(flpos[1:-1])
+
+            # Find by name alone
+            players = [player for player in self.predictionData
+                       if player['FIRST'] == first and player['LAST'] == last]
+
+            if not players:
+                players = self.get_player_interactive()
+
+            # try to look up the team in LEAUGE_TEAMS first, or else use teamDic
+            teamIds = [v[0] for (k, v) in LEAGUE_TEAMS.items() if v[1] == d['team']]
+
+            if not teamIds:
                 teamId = self.get_team_interactive(leagueTeams=teamDic)
+            else:
+                teamId = teamIds[0]
 
-                # update all plots as desired
-                self.been_drafted(players, teamDic[teamId][0])
+            # update all plots as desired
+            self.been_drafted(players, teamId)
+
+            if slow:
+                raw_input()
 
     # Replacement Value Calculation
     def update_replacement_value(self):
@@ -374,7 +389,8 @@ class DraftData():
         lefts = [i for i in range(len(posListSpec))]
         width = 0.4
         mids = [i + width for i in range(len(posListSpec))]
-        allVals = [v for (team, teamVals) in binVals.items() for (k, v) in teamVals.items()]
+        allVals = [v for (team, teamVals) in binVals.items() for (k, v) in teamVals.items()
+                   if not 'flex_' in k]
         maxval = max(allVals)
         minval = min(allVals)
         for (i, team) in enumerate(sorted(teamSummary.keys())):
@@ -396,7 +412,7 @@ class DraftData():
                     height=[binVals[team][pos] for pos in flexKeys],
                     width=width,
                     color='blue',
-                    alpha=0.5
+                    alpha=0.35
                 )
 
             # current vals -- total
@@ -456,8 +472,9 @@ class DraftData():
                 tdsBucket[team][pos] = bestAtPos
 
             # If anyone remains in tds[team] at this point, move them into flex
-            # positions
-            for (i, player) in enumerate(tds[team]):
+            # positions -- sort them according to their pts within the reamining
+            # team
+            for (i, player) in enumerate(sorted(tds[team], key=lambda x: -x['PTS'])):
                 tdsBucket[team]['flex_{}'.format(i)] = player
 
         return tdsBucket
